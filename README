@@ -13,4 +13,4 @@ Instructions
 1 > a Log file comes from a security system.
 2 > SQL DB server gets data and parses it.
 3 > Mini-SIEM uses mysql.connector library to aggregate relevant data from the DB server.
-4 > The Analyzer component identify deviations from the norm and take appropriate action.
+4 > The Analyzer identifies deviations from the norm and take appropriate action.
