@@ -47,11 +47,13 @@ def PortScan():
     for IP in Cursor:
         if IP not in IP_Lst:
             IP_Lst.append(IP)
+
     New_IP_Lst = []
     for Item in IP_Lst:
         New_IP = "".join(Item)
         if New_IP not in New_IP_Lst:
             New_IP_Lst.append(New_IP)
+
     for New_IP in New_IP_Lst:
         Query2 = 'SELECT COUNT(DISTINCT PORT) FROM fwlogs WHERE SRC_IP=' + "'" + New_IP + "'"
         Cursor.execute(Query2)
@@ -74,11 +76,13 @@ def PingSweep():
     for IP in Cursor:
         if IP not in IP_Lst:
             IP_Lst.append(IP)
+
     New_IP_Lst = []
     for Item in IP_Lst:
         New_IP = "".join(Item)
         if New_IP not in New_IP_Lst:
             New_IP_Lst.append(New_IP)
+
     for New_IP in New_IP_Lst:
         Query2 = 'SELECT COUNT(DISTINCT DST_IP) FROM fwlogs WHERE SRC_IP=' + "'" + New_IP + "'" + 'AND PORT=0'
         Cursor.execute(Query2)
@@ -106,11 +110,13 @@ def PingSweepTime():
     for IP in Cursor:
         if IP not in IP_Lst:
             IP_Lst.append(IP)
+
     New_IP_Lst = []
     for Item in IP_Lst:
         New_IP = "".join(Item)
         if New_IP not in New_IP_Lst:
             New_IP_Lst.append(New_IP)
+
     for New_IP in New_IP_Lst:
         Query2 = 'SELECT DISTINCT (DST_IP), DATE FROM fwlogs WHERE SRC_IP=' + "'" + New_IP + "'" + 'ORDER BY DATE DESC LIMIT 1'     # MAX
         Cursor.execute(Query2)
@@ -119,6 +125,7 @@ def PingSweepTime():
             MaxTIME1 = MaxTIME[1]
             if MaxTIME1 not in TIME_LST:
                 TIME_LST.append(MaxTIME1)
+
         Query3 = 'SELECT DISTINCT (DST_IP), DATE FROM fwlogs WHERE SRC_IP=' + "'" + New_IP + "'" + 'ORDER BY DATE LIMIT 1'     # MIN
         Cursor.execute(Query3)
         for MinTIME in Cursor:
@@ -126,16 +133,17 @@ def PingSweepTime():
             if MinTIME1 not in TIME_LST:
                 TIME_LST.append(MinTIME1)
 
-            TimeDifference = GetTimeDifferences(TIME_LST[1], TIME_LST[0])
-            if TimeDifference <= (0, 10):
-                Query4 = 'SELECT COUNT(DISTINCT DST_IP) FROM fwlogs WHERE SRC_IP=' + "'" + New_IP + "'" + 'AND PORT=0'
-                Cursor.execute(Query4)
-                for Dst_IP1 in Cursor:
-                    Dst_IP2 = int(Dst_IP1[0])
-                    if Dst_IP2 >= 10:
-                        print 'This IP Address', New_IP, 'Attempted To Ping', Dst_IP1, 'Different Hosts In Less Than 10 Seconds'
-            else:
-                print 'No Ping-Sweep Attack In Less Than 10 Seconds'
+            if len(TIME_LST) == 2:
+                TimeDifference = GetTimeDifferences(TIME_LST[1], TIME_LST[0])
+                if TimeDifference <= (0, 10):
+                    Query4 = 'SELECT COUNT(DISTINCT DST_IP) FROM fwlogs WHERE SRC_IP=' + "'" + New_IP + "'" + 'AND PORT=0'
+                    Cursor.execute(Query4)
+                    for Dst_IP1 in Cursor:
+                        Dst_IP2 = int(Dst_IP1[0])
+                        if Dst_IP2 >= 10:
+                            print 'This IP Address', New_IP, 'Attempted To Ping', Dst_IP1, 'Different Hosts In Less Than 10 Seconds'
+    else:
+        print 'No Ping-Sweep Attack In Less Than 10 Seconds'
     Cnx.commit()
     Cursor.close()
     Cnx.close()
@@ -144,6 +152,7 @@ def PingSweepTime():
 def main():
     Cnx, Cursor = ConnectToDB()
 
+    # Check;
     SpecificPort()
     PortScan()
     PingSweep()

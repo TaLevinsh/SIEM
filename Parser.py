@@ -1,7 +1,11 @@
 import mysql.connector
 from mysql.connector import errorcode
 
-Log_File_Path = r'C:\Users\Owner\Desktop\Tal\4\22.4 - Python\Ping_Sweep.txt'
+
+# Log files;
+Suspicious_Port_LogFile = r'C:\Mini-SIEM\Suspicious_Port.txt'
+Ping_Sweep_LogFile = r'C:\Mini-SIEM\Ping_Sweep.txt'
+Port_Scan_LogFile = r'C:\Mini-SIEM\Port_Scan.txt'
 
 Ports = {'21': 'FTP', '22': 'SSH', '23': 'TELNET', '25': 'SMTP', '67': 'DHCP', '53': 'DNS', '80': 'HTTP', '445': 'SMB',
          '443': 'HTTPS'}
@@ -75,8 +79,9 @@ def ResetDB():
 def main():
     ResetDB()
     Cnx, Cursor = ConnectToDB()
-    for Dic in AddProtocol(LogFileToDict(Log_File_Path)):
+    for Dic in AddProtocol(LogFileToDict(Ping_Sweep_LogFile)):
         InsertToDB(Dic, Cnx, Cursor)
+
     # Check;
     Query = "SELECT COUNT(*) FROM fwlogs"
     Cursor.execute(Query)
