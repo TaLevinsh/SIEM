@@ -1,7 +1,6 @@
 import mysql.connector
 from mysql.connector import errorcode
 
-
 # Log files;
 Suspicious_Port_LogFile = r'C:\Mini-SIEM\Suspicious_Port.txt'
 Ping_Sweep_LogFile = r'C:\Mini-SIEM\Ping_Sweep.txt'
