@@ -1,6 +1,7 @@
 import mysql.connector
 from mysql.connector import errorcode
 
+
 User = 'root'
 Password = 'P@ssw0rd'
 Host = '192.168.191.129'
