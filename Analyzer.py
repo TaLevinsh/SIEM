@@ -2,165 +2,136 @@ import mysql.connector
 from mysql.connector import errorcode
 
 
-User = 'root'
-Password = 'P@ssw0rd'
-Host = '192.168.191.129'
-Database = 'Siem'
+# Database configuration
+USER = ''
+PASSWORD = ''
+HOST = ''
+DATABASE = ''
 
-
-def ConnectToDB():
+def connect_to_db():
+    """Connect to MySQL database and return the connection and cursor."""
     try:
-        Cnx = mysql.connector.connect(user=User, password=Password,
-                                      host=Host, database=Database)
-        return Cnx, Cnx.cursor(buffered=True)
-    except mysql.connector.Error as Err:
-        if Err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
-            print('Something is wrong with your user name or password')
-        elif Err.errno == errorcode.ER_BAD_DB_ERROR:
+        cnx = mysql.connector.connect(user=USER, password=PASSWORD, host=HOST, database=DATABASE)
+        return cnx, cnx.cursor(buffered=True)
+    except mysql.connector.Error as err:
+        if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+            print('Access denied: Check your username or password')
+        elif err.errno == errorcode.ER_BAD_DB_ERROR:
             print('Database does not exist')
         else:
-            print(Err)
+            print(f"Error: {err}")
         return None
 
 
-def SpecificPort():
-    Cnx, Cursor = ConnectToDB()
-    Query = 'SELECT SRC_IP FROM fwlogs WHERE PORT=444 OR PORT=4445'
-    Cursor.execute(Query)
-    IP_Lst = []
-    for IP in Cursor:
-        if IP not in IP_Lst:
-            IP_Lst.append(IP)
-    if len(IP_Lst) > 0:
-        print 'These IP addresses:', IP_Lst, 'attempted to connect suspicious ports (444 / 4445)'
-    elif len(IP_Lst) == 0:
-        print 'No suspicious port attack'
-    Cnx.commit()
-    Cursor.close()
-    Cnx.close()
+def fetch_distinct_ips(cursor):
+    """Fetch distinct source IPs from the firewall logs."""
+    cursor.execute('SELECT DISTINCT SRC_IP FROM fwlogs')
+    return [item[0] for item in cursor.fetchall()]
 
 
-def PortScan():
-    Cnx, Cursor = ConnectToDB()
-    Query1 = 'SELECT SRC_IP FROM fwlogs'
-    Cursor.execute(Query1)
-    IP_Lst = []
-    for IP in Cursor:
-        if IP not in IP_Lst:
-            IP_Lst.append(IP)
+def specific_port():
+    """Detect attempts to connect to suspicious ports (444/4445)."""
+    cnx, cursor = connect_to_db()
+    if cnx is None:
+        return
 
-    New_IP_Lst = []
-    for Item in IP_Lst:
-        New_IP = "".join(Item)
-        if New_IP not in New_IP_Lst:
-            New_IP_Lst.append(New_IP)
+    query = 'SELECT SRC_IP FROM fwlogs WHERE PORT IN (444, 4445)'
+    cursor.execute(query)
+    ip_list = [item[0] for item in cursor.fetchall()]
 
-    for New_IP in New_IP_Lst:
-        Query2 = 'SELECT COUNT(DISTINCT PORT) FROM fwlogs WHERE SRC_IP=' + "'" + New_IP + "'"
-        Cursor.execute(Query2)
-        for Ports_Num1 in Cursor:
-            Ports_Num2 = int(Ports_Num1[0])
-            if Ports_Num2 >= 10:
-                print 'This IP Address', New_IP, 'Attempted To Connect To', Ports_Num1, 'Different Ports'
+    if ip_list:
+        print(f"These IP addresses attempted to connect to suspicious ports (444 / 4445): {ip_list}")
     else:
-        print 'No Port-Scan Attack'
-    Cnx.commit()
-    Cursor.close()
-    Cnx.close()
+        print("No suspicious port attack detected.")
+    
+    cursor.close()
+    cnx.close()
 
 
-def PingSweep():
-    Cnx, Cursor = ConnectToDB()
-    Query1 = 'SELECT SRC_IP FROM fwlogs'
-    Cursor.execute(Query1)
-    IP_Lst = []
-    for IP in Cursor:
-        if IP not in IP_Lst:
-            IP_Lst.append(IP)
+def port_scan():
+    """Detect port scan attempts (multiple distinct ports from the same IP)."""
+    cnx, cursor = connect_to_db()
+    if cnx is None:
+        return
 
-    New_IP_Lst = []
-    for Item in IP_Lst:
-        New_IP = "".join(Item)
-        if New_IP not in New_IP_Lst:
-            New_IP_Lst.append(New_IP)
+    ip_list = fetch_distinct_ips(cursor)
+    
+    for ip in ip_list:
+        query = f'SELECT COUNT(DISTINCT PORT) FROM fwlogs WHERE SRC_IP="{ip}"'
+        cursor.execute(query)
+        port_count = cursor.fetchone()[0]
 
-    for New_IP in New_IP_Lst:
-        Query2 = 'SELECT COUNT(DISTINCT DST_IP) FROM fwlogs WHERE SRC_IP=' + "'" + New_IP + "'" + 'AND PORT=0'
-        Cursor.execute(Query2)
-        for Dst_IP1 in Cursor:
-            Dst_IP2 = int(Dst_IP1[0])
-            if Dst_IP2 >= 10:
-                print 'This IP Address', New_IP, 'Attempted To Ping', Dst_IP1, 'Different Hosts'
-    else:
-        print 'No Ping-Sweep Attack'
-    Cnx.commit()
-    Cursor.close()
-    Cnx.close()
+        if port_count >= 10:
+            print(f"IP {ip} attempted to connect to {port_count} different ports.")
+    
+    cursor.close()
+    cnx.close()
 
 
-def GetTimeDifferences(Start, End):
-    C = End - Start
-    return divmod(C.days * 86400 + C.seconds, 60)
+def ping_sweep():
+    """Detect ping sweep attempts (same source IP pinging multiple destinations)."""
+    cnx, cursor = connect_to_db()
+    if cnx is None:
+        return
+
+    ip_list = fetch_distinct_ips(cursor)
+    
+    for ip in ip_list:
+        query = f'SELECT COUNT(DISTINCT DST_IP) FROM fwlogs WHERE SRC_IP="{ip}" AND PORT=0'
+        cursor.execute(query)
+        dst_count = cursor.fetchone()[0]
+
+        if dst_count >= 10:
+            print(f"IP {ip} attempted to ping {dst_count} different hosts.")
+    
+    cursor.close()
+    cnx.close()
 
 
-def PingSweepTime():
-    Cnx, Cursor = ConnectToDB()
-    Query1 = 'SELECT SRC_IP FROM fwlogs'
-    Cursor.execute(Query1)
-    IP_Lst = []
-    for IP in Cursor:
-        if IP not in IP_Lst:
-            IP_Lst.append(IP)
+def ping_sweep_time():
+    """Detect rapid ping sweeps (same source IP pinging multiple destinations in under 10 seconds)."""
+    cnx, cursor = connect_to_db()
+    if cnx is None:
+        return
 
-    New_IP_Lst = []
-    for Item in IP_Lst:
-        New_IP = "".join(Item)
-        if New_IP not in New_IP_Lst:
-            New_IP_Lst.append(New_IP)
+    ip_list = fetch_distinct_ips(cursor)
+    
+    for ip in ip_list:
+        query_max = f'SELECT DISTINCT DST_IP, DATE FROM fwlogs WHERE SRC_IP="{ip}" ORDER BY DATE DESC LIMIT 1'
+        query_min = f'SELECT DISTINCT DST_IP, DATE FROM fwlogs WHERE SRC_IP="{ip}" ORDER BY DATE LIMIT 1'
+        
+        cursor.execute(query_max)
+        max_time = cursor.fetchone()[1]  # Latest timestamp
 
-    for New_IP in New_IP_Lst:
-        Query2 = 'SELECT DISTINCT (DST_IP), DATE FROM fwlogs WHERE SRC_IP=' + "'" + New_IP + "'" + 'ORDER BY DATE DESC LIMIT 1'     # MAX
-        Cursor.execute(Query2)
-        TIME_LST = []
-        for MaxTIME in Cursor:
-            MaxTIME1 = MaxTIME[1]
-            if MaxTIME1 not in TIME_LST:
-                TIME_LST.append(MaxTIME1)
+        cursor.execute(query_min)
+        min_time = cursor.fetchone()[1]  # Earliest timestamp
 
-        Query3 = 'SELECT DISTINCT (DST_IP), DATE FROM fwlogs WHERE SRC_IP=' + "'" + New_IP + "'" + 'ORDER BY DATE LIMIT 1'     # MIN
-        Cursor.execute(Query3)
-        for MinTIME in Cursor:
-            MinTIME1 = MinTIME[1]
-            if MinTIME1 not in TIME_LST:
-                TIME_LST.append(MinTIME1)
+        time_difference = get_time_difference(min_time, max_time)
 
-            if len(TIME_LST) == 2:
-                TimeDifference = GetTimeDifferences(TIME_LST[1], TIME_LST[0])
-                if TimeDifference <= (0, 10):
-                    Query4 = 'SELECT COUNT(DISTINCT DST_IP) FROM fwlogs WHERE SRC_IP=' + "'" + New_IP + "'" + 'AND PORT=0'
-                    Cursor.execute(Query4)
-                    for Dst_IP1 in Cursor:
-                        Dst_IP2 = int(Dst_IP1[0])
-                        if Dst_IP2 >= 10:
-                            print 'This IP Address', New_IP, 'Attempted To Ping', Dst_IP1, 'Different Hosts In Less Than 10 Seconds'
-    else:
-        print 'No Ping-Sweep Attack In Less Than 10 Seconds'
-    Cnx.commit()
-    Cursor.close()
-    Cnx.close()
+        if time_difference <= (0, 10):  # Less than 10 seconds
+            query = f'SELECT COUNT(DISTINCT DST_IP) FROM fwlogs WHERE SRC_IP="{ip}" AND PORT=0'
+            cursor.execute(query)
+            dst_count = cursor.fetchone()[0]
+
+            if dst_count >= 10:
+                print(f"IP {ip} attempted to ping {dst_count} different hosts in less than 10 seconds.")
+    
+    cursor.close()
+    cnx.close()
+
+
+def get_time_difference(start, end):
+    """Calculate the time difference between two datetime objects."""
+    delta = end - start
+    return divmod(delta.days * 86400 + delta.seconds, 60)
 
 
 def main():
-    Cnx, Cursor = ConnectToDB()
-
-    # Check;
-    SpecificPort()
-    PortScan()
-    PingSweep()
-    PingSweepTime()
-
-    Cursor.close()
-    Cnx.close()
+    """Main function to run all detection checks."""
+    specific_port()
+    port_scan()
+    ping_sweep()
+    ping_sweep_time()
 
 
 if __name__ == '__main__':
